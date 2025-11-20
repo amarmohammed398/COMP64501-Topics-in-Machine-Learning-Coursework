@@ -1,6 +1,10 @@
 """
-Feel free to replace this code with your own model training code. 
-This is just a simple example to get you started.
+Simple training / evaluation helpers for COMP64501 coursework.
+
+You can extend this for your own experiments, but the basic API is:
+
+    train(model, data_loader, criterion, optimizer, device) -> avg_loss
+    eval(model, data_loader, criterion, device) -> (avg_loss, accuracy)
 """
 
 import numpy as np
@@ -12,11 +16,11 @@ def train(model, data_loader, criterion, optimizer, device):
     model.train()
 
     epoch_loss = 0.0
+
     for inputs, labels in data_loader:
         inputs, labels = inputs.to(device), labels.to(device)
 
         optimizer.zero_grad()
-
         outputs = model(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
@@ -51,4 +55,3 @@ def eval(model, data_loader, criterion, device):
     accuracy = (np.array(predictions) == np.array(targets)).mean()
     avg_loss = total_loss / len(data_loader)
     return avg_loss, accuracy
-
