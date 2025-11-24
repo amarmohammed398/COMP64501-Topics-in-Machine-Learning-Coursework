@@ -18,7 +18,7 @@ def train_fashion_model(fashion_mnist,
                         n_epochs, 
                         batch_size=4,
                         learning_rate=0.001,
-                        USE_GPU=False,):
+                        USE_GPU=True,):                              #TODO: set to false before submission
     """
     You can modify the contents of this function as needed, but DO NOT CHANGE the arguments,
     the function name, or return values, as this will be called during marking!
