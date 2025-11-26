@@ -53,6 +53,16 @@ def train_fashion_model(fashion_mnist,
     criterion.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
+    # ------------------------------
+    # OPTIONAL LEARNING RATE SCHEDULER
+    # Reduces learning rate every 7 epochs by factor 0.5
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer,
+        step_size=7,
+        gamma=0.5
+    )
+    # ------------------------------
+
     # Training loop
     for epoch in range(n_epochs):
         train_loss = engine.train(model, train_loader, criterion, optimizer, device)
@@ -60,6 +70,8 @@ def train_fashion_model(fashion_mnist,
         val_loss, accuracy = engine.eval(model, val_loader, criterion, device)
         print(f"Epoch [{epoch + 1}/{n_epochs}], Val Loss: {val_loss:.4f}, Accuracy: {accuracy:.4f}")
 
+        # Step the scheduler (LR update)
+        scheduler.step()
     # Return the model's state_dict (weights) - DO NOT CHANGE THIS
     return model.state_dict()
 
@@ -73,12 +85,14 @@ def get_transforms(mode='train'):
     or RandomHorizontalFlip unless they can be set to p=0 during eval.
     """
     if mode == 'train':
-        tfs = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(), # convert images to tensors
+        tfs = torchvision.transforms. Compose([
+            torchvision.transforms.ToTensor(),  # convert images to tensors in [0,1]
+            torchvision.transforms.Normalize((0.5,), (0.5,)),  # scale to roughly [-1, 1]
         ])
-    elif mode == 'eval': # no stochastic transforms, or use p=0
+    elif mode == 'eval':  # no stochastic transforms, or use p=0
         tfs = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(), # convert images to tensors
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.5,), (0.5,)),
         ])
         for tf in tfs.transforms:
             if hasattr(tf, 'train'):
@@ -86,7 +100,6 @@ def get_transforms(mode='train'):
     else:
         raise ValueError(f"Unknown mode {mode} for transforms, must be 'train' or 'eval'.")
     return tfs
-
 
 def load_training_data():
     # Load FashionMNIST dataset
@@ -117,7 +130,12 @@ def main():
 
     # Train model 
     # TODO: this may be done within a loop for hyperparameter search / cross-validation
-    model_weights = train_fashion_model(fashion_mnist, n_epochs=1)
+    model_weights = train_fashion_model(
+    fashion_mnist,
+    n_epochs=20,
+    batch_size=64,
+    learning_rate=0.001,
+)
 
     # Save model weights
     # However you tune and evaluate your model, make sure to save the final weights 
