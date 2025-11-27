@@ -1,147 +1,169 @@
 """
-Feel free to replace this code with your own model training code. 
-This is just a simple example to get you started.
+Training utilities for Fashion-MNIST.
 
-This training script uses imports relative to the base directory (assignment/).
-To run this training script with uv, ensure you're in the root directory (assignment/)
-and execute: uv run -m submission.fashion_training
+The training function must keep its name and signature because it will be
+called automatically during marking. You are allowed to edit the internal
+logic, defaults, comments, and structure.
+
+This script expects:
+- submission/fashion_model.py containing class Net
+- submission/engine.py providing train() and eval()
 """
+
 import os
 import numpy as np
-import torch, torchvision
+import torch
+import torchvision
 
 from submission import engine
 from submission.fashion_model import Net
 
 
-def train_fashion_model(fashion_mnist, 
-                        n_epochs, 
-                        batch_size=4,
-                        learning_rate=0.001,
-                        USE_GPU=False,):
+def train_fashion_model(
+    fashion_mnist,
+    n_epochs,
+    batch_size=4,
+    learning_rate=0.001,
+    USE_GPU=False,
+):
     """
-    You can modify the contents of this function as needed, but DO NOT CHANGE the arguments,
-    the function name, or return values, as this will be called during marking!
-    (You can change the default values or add additional keyword arguments if needed.)
+    Train a model on Fashion-MNIST.
+
+    Arguments and return value MUST remain unchanged for marking.
+
+    Parameters:
+        fashion_mnist: Dataset
+        n_epochs: training epochs
+        batch_size: dataloader batch size
+        learning_rate: optimiser LR
+        USE_GPU: optional GPU use
+
+    Returns:
+        model.state_dict(): trained weights
     """
-    # Optionally use GPU if available
+
+    # ---- Device selection ----
     if USE_GPU and torch.cuda.is_available():
-        device = torch.device('cuda')
+        device = torch.device("cuda")
     else:
-        device = torch.device('cpu')
+        device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    # Create train-val split
+    # ---- Dataset split (80/20 train/val) ----
     train_size = int(0.8 * len(fashion_mnist))
     val_size = len(fashion_mnist) - train_size
-    train_data, val_data = torch.utils.data.random_split(fashion_mnist, [train_size, val_size])
+    train_data, val_data = torch.utils.data.random_split(
+        fashion_mnist, [train_size, val_size]
+    )
 
-    # dataloaders
-    train_loader = torch.utils.data.DataLoader(train_data,
-                                             batch_size=batch_size,
-                                             shuffle=True,
-                                             )
-    val_loader = torch.utils.data.DataLoader(val_data,
-                                             batch_size=batch_size,
-                                             shuffle=False,
-                                             )
+    # ---- DataLoaders ----
+    train_loader = torch.utils.data.DataLoader(
+        train_data,
+        batch_size=batch_size,
+        shuffle=True,
+    )
+    val_loader = torch.utils.data.DataLoader(
+        val_data,
+        batch_size=batch_size,
+        shuffle=False,
+    )
 
-    # Initialize model, loss function, and optimizer
-    model = Net()
-    model.to(device)
-    criterion = torch.nn.CrossEntropyLoss()
-    criterion.to(device)
+    # ---- Model, loss, optimizer ----
+    model = Net().to(device)
+    criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    # ------------------------------
-    # OPTIONAL LEARNING RATE SCHEDULER
-    # Reduces learning rate every 7 epochs by factor 0.5
+    # Optional LR schedule
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer,
         step_size=7,
-        gamma=0.5
+        gamma=0.5,
     )
-    # ------------------------------
 
-    # Training loop
+    # ---- Training loop ----
     for epoch in range(n_epochs):
         train_loss = engine.train(model, train_loader, criterion, optimizer, device)
         print(f"Epoch [{epoch + 1}/{n_epochs}], Training Loss: {train_loss:.4f}")
+
         val_loss, accuracy = engine.eval(model, val_loader, criterion, device)
         print(f"Epoch [{epoch + 1}/{n_epochs}], Val Loss: {val_loss:.4f}, Accuracy: {accuracy:.4f}")
 
-        # Step the scheduler (LR update)
         scheduler.step()
-    # Return the model's state_dict (weights) - DO NOT CHANGE THIS
+
+    # Required by marking script — do not modify
     return model.state_dict()
 
 
-def get_transforms(mode='train'):
+def get_transforms(mode="train"):
     """
-    Define any data augmentations or preprocessing here if needed.
-    Only standard torchvision transforms are permitted (no lambda functions), please check that 
-    these pass by running model_calls.py before submission. Transforms will be set to .eval()
-    (deterministic) mode during evaluation, so avoid using stochastic transforms like RandomCrop
-    or RandomHorizontalFlip unless they can be set to p=0 during eval.
+    Construct transforms for training or evaluation.
+
+    Restrictions:
+    - Only torchvision transforms allowed.
+    - No lambda transforms.
+    - Must remain deterministic in eval mode.
     """
-    if mode == 'train':
-        tfs = torchvision.transforms. Compose([
-            torchvision.transforms.ToTensor(),  # convert images to tensors in [0,1]
-            torchvision.transforms.Normalize((0.5,), (0.5,)),  # scale to roughly [-1, 1]
-        ])
-    elif mode == 'eval':  # no stochastic transforms, or use p=0
+
+    if mode == "train":
         tfs = torchvision.transforms.Compose([
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.5,), (0.5,)),
         ])
+
+    elif mode == "eval":
+        tfs = torchvision.transforms.Compose([
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.5,), (0.5,)),
+        ])
+
+        # Ensure deterministic behaviour
         for tf in tfs.transforms:
-            if hasattr(tf, 'train'):
-                tf.eval()  # set to eval mode if applicable # type: ignore
+            if hasattr(tf, "train"):
+                tf.eval()
+
     else:
-        raise ValueError(f"Unknown mode {mode} for transforms, must be 'train' or 'eval'.")
+        raise ValueError("Mode must be 'train' or 'eval'.")
+
     return tfs
 
+
 def load_training_data():
-    # Load FashionMNIST dataset
-    # Do not change the dataset or its parameters
+    """
+    Load Fashion-MNIST (train split only).
+    Applies transforms defined above.
+    """
+
     print("Loading Fashion-MNIST dataset...")
     fashion_mnist = torchvision.datasets.FashionMNIST(
         root="./data",
         train=True,
         download=True,
     )
-    # We load in data as the raw PIL images - recommended to have a look in visualise_dataset.py! 
-    # To use them for training or inference, we need to transform them to tensors. 
-    # We set this transform here, as well as any other data preprocessing or augmentation you 
-    # wish to apply.
-    fashion_mnist.transform = get_transforms(mode='train')
+
+    # Attach preprocessing pipeline
+    fashion_mnist.transform = get_transforms(mode="train")
     return fashion_mnist
 
 
 def main():
-    # example usage
-    # you could create a separate file that calls train_fashion_model with different parameters
-    # or modify this as needed to add cross-validation, hyperparameter tuning, etc.
+    """
+    Example training entry point.
+    You may expand this for hyperparameter search,
+    cross-validation, etc.
+    """
+
     fashion_mnist = load_training_data()
 
-    # TODO: create data splits
-
-    # TODO: implement hyperparameter search
-
-    # Train model 
-    # TODO: this may be done within a loop for hyperparameter search / cross-validation
     model_weights = train_fashion_model(
-    fashion_mnist,
-    n_epochs=20,
-    batch_size=64,
-    learning_rate=0.001,
-)
+        fashion_mnist,
+        n_epochs=20,
+        batch_size=64,
+        learning_rate=0.001,
+    )
 
-    # Save model weights
-    # However you tune and evaluate your model, make sure to save the final weights 
-    # to submission/model_weights.pth before submission!
-    model_save_path = os.path.join('submission', 'model_weights.pth')
-    torch.save(model_weights, f=model_save_path)
+    # Save trained weights (required for submission)
+    model_save_path = os.path.join("submission", "model_weights.pth")
+    torch.save(model_weights, model_save_path)
 
 
 if __name__ == "__main__":
